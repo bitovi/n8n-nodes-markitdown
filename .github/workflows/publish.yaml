@@ -25,5 +25,3 @@ jobs:
           update_type: 'patch'
           npm_token: ${{ secrets.NPM_TOKEN }}
           publish: true
-          git_user_name: "github-actions"
-          git_user_email: "os@bitovi.com"

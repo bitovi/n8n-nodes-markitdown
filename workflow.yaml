@@ -25,7 +25,9 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Publish n8n-nodes-markitdown package
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: "Publish n8n-nodes-markitdown package"
+        uses: bitovi/github-actions-npm-publish:v1.0.0
+        with:
+          update_type: 'patch'
+          npm_token: ${{ secrets.NPM_TOKEN }}
+          publish: true

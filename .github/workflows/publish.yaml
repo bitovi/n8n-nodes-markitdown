@@ -20,8 +20,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: bitovi/github-actions-npm-publish@main
+      - uses: bitovi/github-actions-npm-publish@dev
         with:
           update_type: 'patch'
           npm_token: ${{ secrets.NPM_TOKEN }}
           publish: true
+          git_user_name: "github-actions"
+          git_user_email: "os@bitovi.com"

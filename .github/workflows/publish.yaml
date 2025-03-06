@@ -25,3 +25,5 @@ jobs:
           update_type: 'patch'
           npm_token: ${{ secrets.NPM_TOKEN }}
           publish: true
+          git_user_name: "os@bitovi.com"
+

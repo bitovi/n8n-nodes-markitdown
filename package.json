@@ -35,7 +35,6 @@
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,
-    "credentials": [],
     "nodes": [
       "dist/nodes/Markitdown/MarkitdownNode.node.js"
     ]

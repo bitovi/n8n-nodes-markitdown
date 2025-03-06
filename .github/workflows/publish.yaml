@@ -20,7 +20,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: bitovi/github-actions-npm-publish@v1.0.0
+      - uses: bitovi/github-actions-npm-publish:v1.0.0
         with:
           update_type: 'patch'
           npm_token: ${{ secrets.NPM_TOKEN }}

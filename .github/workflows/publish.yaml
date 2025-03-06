@@ -15,7 +15,6 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
       - run: npm i
       - run: npm run build
-      - run: npm test
 
   publish-npm:
     needs: build

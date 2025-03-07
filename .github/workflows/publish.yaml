@@ -26,4 +26,45 @@ jobs:
           npm_token: ${{ secrets.NPM_TOKEN }}
           publish: true
           git_user_name: "os@bitovi.com"
+  build-and-publish-image:
+    runs-on: ubuntu-latest
+    needs: publish-npm
 
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Tag the image
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            bitovi/n8n-nodes-markitdown
+          tags: |
+            type=raw,value=${{ inputs.project }}-latest,enable=${{ github.ref_name == 'main' }}
+            type=semver,pattern=${{ inputs.project }}-{{version}},enable=${{ github.event_name == 'release' }}
+      -
+        name: Login to Docker Hub
+        uses: docker/login-action@v2
+        if: github.event_name != 'pull_request'
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      -
+        name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ inputs.project }}
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+      -
+        name: Push Docker image
+        uses: docker/build-push-action@v4
+        if: ${{ (github.ref_name == 'main') || (github.event_name == 'release') }}
+        with:
+          context: ${{ inputs.project }}
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          push: true

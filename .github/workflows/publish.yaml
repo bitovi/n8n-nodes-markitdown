@@ -43,7 +43,7 @@ jobs:
           images: |
             bitovi/n8n-nodes-markitdown
           tags: |
-            type=raw,value=${{ inputs.project }}-latest,enable=${{ github.ref_name == 'main' }}
+            type=raw,value=${{ inputs.project }}latest,enable=${{ github.ref_name == 'main' }}
             type=semver,pattern=${{ inputs.project }}-{{version}},enable=${{ github.event_name == 'release' }}
       -
         name: Login to Docker Hub

@@ -1,4 +1,4 @@
-name: Publish Package to NPM
+name: Publish Package to NPM and Dockerhub
 
 on:
   release:

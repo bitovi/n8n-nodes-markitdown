@@ -61,16 +61,5 @@ RUN cp -R dist/nodes/ /home/node/.n8n/custom/
 # Create data directory for n8n
 RUN mkdir -p /root/.n8n
 
-# Create a shared directory for input/output files
-RUN mkdir -p /shared
-RUN chmod 777 /shared
-
-# Expose port for n8n
-EXPOSE 5678
-
-# Set environment variables
-ENV N8N_PORT=5678
-ENV N8N_PROTOCOL=http
-# ENV NODE_ENV=production
 WORKDIR /
 USER node

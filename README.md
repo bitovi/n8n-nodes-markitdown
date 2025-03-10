@@ -7,7 +7,6 @@ This repo contains [N8N](https://n8n.io/) node to work with Microsoft's [Markitd
 - Make sure to allow community nodes with `N8N_COMMUNITY_PACKAGES_ENABLED=true`
 - Once logged in to your N8N web UI, go to `/settings/community-nodes` and type `@bitovi/n8n-nodes-markitdown`
 
-
 ## File Types accepted
 At present, MarkItDown supports:
 
@@ -25,7 +24,7 @@ Youtube URLs
 
 ## How to find the node?
 You can search markitdown in the searchbar.
-It will look like this: [markitdownnode](`/markitdown.png`)
+It will look like this: [markitdownnode](/markitdown.png)
 
 ## Have your own hosted version of n8n? Here is how to add out markitdown node to your Docker file
 Here is the following code to pull in the markitdown dependency and then install the markitdown nod

@@ -51,7 +51,7 @@ RUN git clone https://github.com/microsoft/markitdown.git && \
 
 WORKDIR /app
 
-RUN git clone https://github.com/EmilK15/markitdownnode.git
+RUN git clone https://github.com/bitovi/n8n-nodes-markitdown
 
 WORKDIR /app/markitdownnode
 

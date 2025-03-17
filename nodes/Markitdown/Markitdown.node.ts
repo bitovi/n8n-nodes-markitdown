@@ -63,14 +63,12 @@ export class Markitdown implements INodeType {
 				await execPromise(command);
 
         const outputContent = await fsPromise.readFile(outputTmpFile.path, 'utf-8');
-
         const newItem: INodeExecutionData = {
           json: {
 						data: outputContent
 					},
           binary: { },
         };
-
         returnData.push(newItem);
 
         // Clean up temporary files

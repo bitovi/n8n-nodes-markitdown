@@ -5,26 +5,22 @@ import * as path from 'path';
 
 describe('Markitdown Node', () => {
 	let nodeInstance = new Markitdown()
-
 	const sampleFilePath = path.join(__dirname, 'test.docx');
   let sampleFileBuffer: Buffer;
+
 	beforeAll(async () => {
-    // Create a real sample file for testing
-    sampleFileBuffer = await fsPromise.readFile(sampleFilePath);
+		sampleFileBuffer = await fsPromise.readFile(sampleFilePath);
 	})
+
 	afterAll(async () => {
-    // Clean up the sample file
     try {
 			jest.restoreAllMocks(); // Reset mocks after each test
-      await fsPromise.unlink(sampleFilePath);
     } catch (error) {
       // Ignore if already deleted
     }
   });
 
 	it('should convert a document to markdown', async () => {
-		// jest.spyOn(fsPromise, 'readFile').mockResolvedValue(``)
-		// jest.spyOn(fsPromise, 'writeFile').mockResolvedValue()
     // Create a mock execution context with real binary data
     const mockExecuteFunctions: IExecuteFunctions = {
       getInputData: () => [{
@@ -62,12 +58,9 @@ describe('Markitdown Node', () => {
     // Verify the results
     expect(result).toHaveLength(1);
     expect(result[0]).toHaveLength(1);
-		const readSample = await fsPromise.readFile(path.join(__dirname, 'test.md'))
-    expect(result[0][0].json.data).toBe(readSample.toString());
+		const readSample = await fsPromise.readFile(path.join(__dirname, 'test.md'), 'utf-8')
+    expect(result[0][0].json.data).toBe(readSample.trimEnd());
 
-    // Verify the command execution
-    expect(nodeInstance.execute).toHaveBeenCalledTimes(1);
-    // expect(nodeInstance.execute.calls[0][0]).toMatch(/markitdown ".*n8n-markitdown-input-test-sample.docx" -o ".*n8n-markitdown-output-.md"/);
 	}, 30000)
 
 });

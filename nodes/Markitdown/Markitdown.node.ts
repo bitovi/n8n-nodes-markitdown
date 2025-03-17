@@ -47,29 +47,23 @@ export class Markitdown implements INodeType {
 
 				const binaryData = this.helpers.assertBinaryData(i, inputBinaryField);
 
-				// Step 2: Write the file to a tmp directory
 				const inputTmpFile = await tmpFile({
 					prefix: 'n8n-markitdown-input-',
 					postfix: binaryData.fileName
 				});
 				await fsPromise.writeFile(inputTmpFile.path, Buffer.from(binaryData.data, 'base64'));
 
-				// Step 3: Run markitdown command on the tmp file
 				const outputTmpFile = await tmpFile({
 					prefix: 'n8n-markitdown-output-',
-					postfix: '.md'
+					postfix: '.md',
 				});
 
-        // Build the markitdown command
         const command = `markitdown "${inputTmpFile.path}" -o "${outputTmpFile.path}"`.trim();
 
-        // Execute markitdown
-        await execPromise(command);
+				await execPromise(command);
 
-        // Read the output file
         const outputContent = await fsPromise.readFile(outputTmpFile.path, 'utf-8');
 
-        // Prepare the output item
         const newItem: INodeExecutionData = {
           json: {
 						data: outputContent

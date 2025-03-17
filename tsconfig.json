@@ -27,4 +27,7 @@
 		"nodes/**/*.json",
 		"package.json",
 	],
+	"exclude": [
+		"nodes/Markitdown/test/*.test.js"
+	]
 }

@@ -52,8 +52,9 @@ jobs:
       - name: Build project
         run: npm run build --if-present
 
-      - name: Run tests
-        run: npm run test --if-present
+      # Exclude tests in publish workflow due to special dependencies required.
+      #- name: Run tests
+      #  run: npm run test --if-present
 
       - run: npm publish --access public
         env:

@@ -49,14 +49,14 @@ jobs:
         run: pnpm i
 
       - name: Run CI
-        run: pnpm run ci --if-present
+        run: pnpm run --if-present ci
 
       - name: Build project
-        run: pnpm run build --if-present
+        run: pnpm run --if-present build
 
       # Exclude tests in publish workflow due to special dependencies required.
       #- name: Run tests
-      #  run: pnpm run test --if-present
+      #  run: pnpm run --if-present test
 
       - run: npm publish --access public
         env:

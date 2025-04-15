@@ -1,0 +1,62 @@
+name: Publish
+
+# This builds and pushes the package to NPM. If something goes wrong, then the package is
+# not published. The error should be corrected and the release and tag should be deleted
+# before trying again.
+
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check package.json version mismatch
+        run: |
+          # This will exit the step if the version matches.
+          npm version ${{ github.event.release.tag_name }} --no-git-tag-version
+
+          # If the version doesn't match, we set this flag to stop the workflow.
+          echo 1 > .version-mismatch
+        # We need to continue on error to allow `npm version` to fail and we continue.
+        # It fails if the version is the same, which is what we want.
+        continue-on-error: true
+      
+      # The package.json version should be updated before releasing. If the version
+      # doesn't match what is being released, the release will fail.
+      - name: Ensure package.json version matches release
+        run: |
+          if [ -f .version-mismatch ]; then
+            echo "Package version does not match release. Update the version in package.json, delete the release and tag, and try again."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install packages
+        run: npm i
+
+      - name: Run CI
+        run: npm run ci --if-present
+
+      - name: Build project
+        run: npm run build --if-present
+
+      - name: Run tests
+        run: npm run test --if-present
+
+      - run: npm publish --access public
+        env:
+          # setup-node creates an .npmrc that references NODE_AUTH_TOKEN
+          # secrets.NPM_TOKEN must be provided in the repo settings.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

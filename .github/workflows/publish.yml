@@ -23,23 +23,12 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Check package.json version mismatch
+      - name: Catch package.json version mismatch
         run: |
-          # This will exit the step if the version matches.
-          npm version ${{ github.event.release.tag_name }} --no-git-tag-version
-
-          # If the version doesn't match, we set this flag to stop the workflow.
-          echo 1 > .version-mismatch
-        # We need to continue on error to allow `npm version` to fail and we continue.
-        # It fails if the version is the same, which is what we want.
-        continue-on-error: true
-      
-      # The package.json version should be updated before releasing. If the version
-      # doesn't match what is being released, the release will fail.
-      - name: Ensure package.json version matches release
-        run: |
-          if [ -f .version-mismatch ]; then
-            echo "Package version does not match release. Update the version in package.json, delete the release and tag, and try again."
+          ver=v$(node -p "require('./package.json').version")
+          echo "Version in package.json: $ver"
+          echo "Version in release: ${{ github.event.release.tag_name }}"
+          if [ "$ver" != "${{ github.event.release.tag_name }}" ]; then
             exit 1
           fi
 

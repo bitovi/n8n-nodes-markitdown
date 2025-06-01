@@ -1,6 +1,6 @@
 # @bitovi/n8n-nodes-markitdown
 
-This repo contains [N8N](https://n8n.io/) node to work with Microsoft's [Markitdown](https://github.com/microsoft/markitdown).
+This repo contains an [n8n](https://n8n.io/) community node that intregrates with Microsoft's [Markitdown](https://github.com/microsoft/markitdown) tool for converting various document formats into structured Markdown.
 
 ## Installation
 

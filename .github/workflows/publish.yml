@@ -99,9 +99,14 @@ jobs:
         run: pnpm run --if-present ci
       - name: Build project
         run: pnpm run --if-present build
-      - run: npm publish --access public
+        # TODO replace with real run
+      - name: Dry-run npm publish
+        run: npm publish --access public --dry-run
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      #- run: npm publish --access public
+        #env:
+          #NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   build-and-publish-image:
     runs-on: ubuntu-latest
@@ -133,11 +138,20 @@ jobs:
             type=raw,value=next,enable=${{ github.event_name == 'release' && github.event.release.prerelease }}
             # On a stable release OR a scheduled run, update the 'latest' tag
             type=raw,value=latest,enable=${{ (github.event_name == 'release' && !github.event.release.prerelease) || github.event_name == 'schedule' }}
-      - name: Build and push Docker image
+      - name: Build and 'dry-run' push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          push: false # <--- TO THIS
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
+            # TODO replace with real run
+      #- name: Build and push Docker image
+        #uses: docker/build-push-action@v5
+        #with:
+          #context: .
+          #push: true
+          #tags: ${{ steps.meta.outputs.tags }}
+          #labels: ${{ steps.meta.outputs.labels }}
+          #platforms: linux/amd64,linux/arm64

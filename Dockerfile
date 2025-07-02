@@ -1,5 +1,5 @@
 # Start with a Node.js base image (n8n requires Node.js)
-FROM n8nio/n8n:1.75.2
+FROM n8nio/n8n:latest
 
 USER root
 

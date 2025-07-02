@@ -45,9 +45,7 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
 WORKDIR /
 
 # Actual part needed
-RUN git clone https://github.com/microsoft/markitdown.git && \
-    cd markitdown && \
-    pip install --use-pep517 packages/markitdown
+RUN pip install markitdown
 
 WORKDIR /app
 

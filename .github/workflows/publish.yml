@@ -7,6 +7,8 @@ name: Publish
 #    If so, it rebuilds and pushes only the 'latest' tag of your custom Docker image to keep it fresh.
 
 on:
+  # TODO remove pr trigger
+  pull_request:
   release:
     types: [published]
   schedule:
@@ -130,6 +132,9 @@ jobs:
         with:
           images: bitovi/n8n-nodes-markitdown
           tags: |
+            # For PRs, create a temporary tag like 'pr-123'
+            type=ref,event=pr
+
             # On release, tag with full semver (e.g., 1.2.3, 1.2.3-rc1)
             type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
             # On stable release, also tag with major.minor
@@ -138,6 +143,20 @@ jobs:
             type=raw,value=next,enable=${{ github.event_name == 'release' && github.event.release.prerelease }}
             # On a stable release OR a scheduled run, update the 'latest' tag
             type=raw,value=latest,enable=${{ (github.event_name == 'release' && !github.event.release.prerelease) || github.event_name == 'schedule' }}
+      #- name: Extract Docker metadata
+        #id: meta
+        #uses: docker/metadata-action@v5
+        #with:
+          #images: bitovi/n8n-nodes-markitdown
+          #tags: |
+            ## On release, tag with full semver (e.g., 1.2.3, 1.2.3-rc1)
+            #type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
+            ## On stable release, also tag with major.minor
+            #type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
+            ## On pre-release, tag with 'next'
+            #type=raw,value=next,enable=${{ github.event_name == 'release' && github.event.release.prerelease }}
+            ## On a stable release OR a scheduled run, update the 'latest' tag
+            #type=raw,value=latest,enable=${{ (github.event_name == 'release' && !github.event.release.prerelease) || github.event_name == 'schedule' }}
       - name: Build and 'dry-run' push Docker image
         uses: docker/build-push-action@v5
         with:

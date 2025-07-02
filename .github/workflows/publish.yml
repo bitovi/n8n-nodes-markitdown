@@ -77,9 +77,13 @@ jobs:
         with:
           images: bitovi/n8n-nodes-markitdown
           tags: |
+            # For all releases, tag with the full semver version (e.g., 1.2.3, 1.2.3-rc1)
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
+            # For stable releases, also tag with major.minor and latest
+            type=semver,pattern={{major}}.{{minor}},enable=${{ !github.event.release.prerelease }}
+            type=raw,value=latest,enable=${{ !github.event.release.prerelease }}
+            # For pre-releases, also tag with 'next'
+            type=raw,value=next,enable=${{ github.event.release.prerelease }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5

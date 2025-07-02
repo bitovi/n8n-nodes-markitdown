@@ -54,7 +54,7 @@ RUN git clone https://github.com/bitovi/n8n-nodes-markitdown
 WORKDIR /app/markitdownnode
 
 RUN npm i -g child_process fs-extra tmp-promise
-RUN cp -R dist/nodes/ /home/node/.n8n/custom/
+COPY dist/nodes/ /home/node/.n8n/custom/
 
 # Create data directory for n8n
 RUN mkdir -p /root/.n8n

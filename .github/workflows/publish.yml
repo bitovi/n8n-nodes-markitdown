@@ -1,20 +1,13 @@
 name: Publish
 
-# This workflow can be triggered in two ways:
-# 1. On Release: When a new GitHub release is published. This is for new versions of YOUR code.
-#    It checks for a new n8n base, then publishes to both npm and Docker Hub with semver tags.
-# 2. On Schedule: Runs once a day to check if the official n8n image has been updated.
-#    If so, it rebuilds and pushes only the 'latest' tag of your custom Docker image to keep it fresh.
-
 on:
-  # TODO remove pr trigger
+  # TODO: Remove pull_request trigger before merging to main
   pull_request:
   release:
     types: [published]
   schedule:
-    # Runs at 00:00 UTC every day
     - cron: '0 0 * * *'
-  workflow_dispatch: # Allows for manual runs from the Actions tab
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -30,7 +23,6 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-
       - name: Check for newer n8n base image
         id: check
         env:
@@ -38,7 +30,6 @@ jobs:
         run: |
           latest_official_n8n=$(npm view n8n version)
           echo "Latest official n8n version on npm: $latest_official_n8n"
-
           echo "Verifying tag '$latest_official_n8n' exists on Docker Hub for n8nio/n8n..."
           tag_count=$(curl -s "https://hub.docker.com/v2/repositories/n8nio/n8n/tags/?page_size=1&name=${latest_official_n8n}" | jq '.count')
           if [ "$tag_count" -eq 0 ]; then
@@ -47,14 +38,12 @@ jobs:
             exit 0
           fi
           echo "Latest official version '$latest_official_n8n' is confirmed on Docker Hub."
-
           echo "Attempting to pull our existing image: ${MY_IMAGE}:latest"
           if ! docker pull "${MY_IMAGE}:latest"; then
             echo "Could not pull existing image. Assuming first run. Proceeding to publish."
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
           current_base_version=$(docker run --rm "${MY_IMAGE}:latest" --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
           if [ -z "$current_base_version" ]; then
             echo "Could not determine n8n version from our image. Proceeding to publish."
@@ -62,9 +51,7 @@ jobs:
             exit 0
           fi
           echo "Current n8n base version in our image: $current_base_version"
-
           highest_version=$(printf "%s\n%s" "$current_base_version" "$latest_official_n8n" | sort -V | tail -n 1)
-
           if [[ "$highest_version" == "$latest_official_n8n" && "$latest_official_n8n" != "$current_base_version" ]]; then
             echo "A newer official n8n version ($latest_official_n8n) is available. Proceeding to publish."
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
@@ -73,11 +60,32 @@ jobs:
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
           fi
 
-  build-and-publish-npm:
+  build:
     runs-on: ubuntu-latest
     needs: check-version
-    # This job ONLY runs on a release trigger, not on the schedule.
-    if: github.event_name == 'release' && needs.check-version.outputs.should_publish == 'true'
+    if: needs.check-version.outputs.should_publish == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v4
+      - name: Install packages
+        run: pnpm i
+      - name: Build project
+        run: pnpm run --if-present build
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-artifact
+          path: dist/
+
+  build-and-publish-npm:
+    runs-on: ubuntu-latest
+    needs: build # Depends on the build job now
+    if: github.event_name == 'release' # No longer needs the check-version output, inherits it via `needs`
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -86,6 +94,11 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-artifact
+          path: dist/
       - name: Catch package.json version mismatch
         run: |
           ver=v$(node -p "require('./package.json').version")
@@ -94,29 +107,22 @@ jobs:
           if [ "$ver" != "${{ github.event.release.tag_name }}" ]; then
             exit 1
           fi
-      - uses: pnpm/action-setup@v4
-      - name: Install packages
-        run: pnpm i
-      - name: Run CI
-        run: pnpm run --if-present ci
-      - name: Build project
-        run: pnpm run --if-present build
-        # TODO replace with real run
       - name: Dry-run npm publish
         run: npm publish --access public --dry-run
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      #- run: npm publish --access public
-        #env:
-          #NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   build-and-publish-image:
     runs-on: ubuntu-latest
-    needs: check-version
-    if: needs.check-version.outputs.should_publish == 'true'
+    needs: build # Depends on the build job now
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Download dist artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-artifact
+          path: dist/
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
@@ -143,8 +149,8 @@ jobs:
             type=raw,value=next,enable=${{ github.event_name == 'release' && github.event.release.prerelease }}
             # On a stable release OR a scheduled run, update the 'latest' tag
             type=raw,value=latest,enable=${{ (github.event_name == 'release' && !github.event.release.prerelease) || github.event_name == 'schedule' }}
-      #- name: Extract Docker metadata
-        #id: meta
+
+      # TODO: Before merge, set push: true
         #uses: docker/metadata-action@v5
         #with:
           #images: bitovi/n8n-nodes-markitdown
@@ -161,7 +167,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: false # <--- TO THIS
+          push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64

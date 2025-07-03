@@ -16,7 +16,7 @@ on:
 
 permissions:
   contents: read
-  packages: write # Needed for publishing to Docker Hub / GHCR
+  packages: write # Needed for publishing to Docker Hub
 
 jobs:
   check-version:

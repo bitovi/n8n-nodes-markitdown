@@ -151,6 +151,7 @@ jobs:
         with:
           images: bitovi/n8n-nodes-markitdown
           tags: |
+            type=raw,value=latest,enable=${{ github.event.inputs.force_publish == 'true' }}
             type=raw,value=${{ needs.check-version.outputs.n8n_version }}
             type=schedule,pattern=latest
             type=ref,event=pr

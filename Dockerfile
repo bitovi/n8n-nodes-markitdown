@@ -1,42 +1,38 @@
-# Use the Debian variant of the n8n image
+# Use the default Alpine n8n image
 ARG N8N_VERSION=latest
 FROM n8nio/n8n:${N8N_VERSION}
 
 # Switch to the root user for installations
 USER root
 
-# === Python Dependencies (from before, still correct) ===
-# Install Python tools and then clean up to keep the image small
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends git python3-pip && \
-    pip install markitdown && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# === Python Dependencies for Alpine ===
+# This uses Alpine's 'apk' package manager.
+# 1. Create a temporary virtual package '.build-deps' with all build dependencies.
+# 2. Use pip to install markitdown, adding '--break-system-packages' to handle PEP 668.
+# 3. Remove the entire virtual package, cleaning up build tools to keep the image small.
+RUN apk add --no-cache --virtual .build-deps git build-base python3-dev py3-pip && \
+    pip install markitdown --break-system-packages && \
+    apk del .build-deps
 
-# === Node.js Dependencies (The Fix) ===
-
+# === Node.js Dependencies ===
 # Set the working directory for our custom node installation
 WORKDIR /home/node/.n8n/custom
 
-# 1. Copy only the package manifest files.
-# This leverages Docker's layer caching. If these files don't change,
-# Docker won't re-run the `pnpm install` step on subsequent builds.
+# Copy package manifests to leverage Docker cache
 COPY package.json pnpm-lock.yaml ./
 
-# 2. Install ONLY production dependencies using pnpm.
-# The `pnpm` command is available in the n8n base image.
-# The `--prod` flag skips devDependencies, keeping the image lean.
+# Install production Node.js dependencies. 'pnpm' is included in the base image.
 RUN pnpm install --prod
 
-# 3. Copy the rest of your built code.
-# This will copy your actual node files from dist/ into the current directory.
+# Copy the built application code
 COPY dist/ .
 
+# === Final Steps ===
 # Ensure the 'node' user owns all the new files
 RUN chown -R node:node /home/node/.n8n/custom
 
 # Switch back to the non-privileged 'node' user for security
 USER node
 
-# Set the main working directory back to n8n's default (optional but good practice)
+# Set the main working directory back to n8n's default
 WORKDIR /home/node

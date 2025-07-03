@@ -14,6 +14,7 @@ permissions:
   packages: write # Needed for publishing to Docker Hub / GHCR
 
 jobs:
+
   check-version:
     runs-on: ubuntu-latest
     outputs:
@@ -34,14 +35,16 @@ jobs:
           echo "Latest official n8n version on npm: $latest_official_n8n"
           echo "n8n_version=${latest_official_n8n}" >> "$GITHUB_OUTPUT"
 
-          n8n_tag="${latest_official_n8n}"
-          echo "Verifying tag '$n8n_tag' exists on Docker Hub for n8nio/n8n..."
-          if ! docker manifest inspect "n8nio/n8n:${n8n_tag}" > /dev/null; then
-            echo "Latest Debian version '$n8n_tag' not yet available on Docker Hub. Halting."
+          # <-- THIS IS THE CORRECTED PART
+          # We are now checking for the plain tag, NOT the "-debian" suffixed one.
+          echo "Verifying tag '$latest_official_n8n' exists on Docker Hub for n8nio/n8n..."
+          if ! docker manifest inspect "n8nio/n8n:${latest_official_n8n}" > /dev/null; then
+            echo "Latest npm version '$latest_official_n8n' not yet available on Docker Hub. Halting."
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "Latest official Debian version '$n8n_tag' is confirmed on Docker Hub."
+          echo "Latest official version '$latest_official_n8n' is confirmed on Docker Hub."
+
 
           echo "Attempting to pull our existing image: ${MY_IMAGE}:latest"
           if ! docker pull "${MY_IMAGE}:latest"; then

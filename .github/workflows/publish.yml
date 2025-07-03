@@ -1,7 +1,6 @@
 name: Publish
 
 on:
-  pull_request:
   release:
     types: [published]
   schedule:
@@ -156,13 +155,11 @@ jobs:
         with:
           images: bitovi/n8n-nodes-markitdown
           tags: |
-            type=raw,value=latest,enable=${{ github.event.inputs.force_publish == 'true' }}
+            # This is the key: it will run when you merge to main.
+            type=raw,value=latest,enable={{is_default_branch}}
             type=raw,value=${{ needs.check-version.outputs.n8n_version }}
-            type=schedule,pattern=latest
-            type=ref,event=pr
             type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
-            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:

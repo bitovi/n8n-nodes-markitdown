@@ -6,17 +6,19 @@ on:
   release:
     types: [published]
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 0 * * *' # Daily at midnight UTC
   workflow_dispatch:
 
 permissions:
   contents: read
+  packages: write # Needed for publishing to Docker Hub / GHCR
 
 jobs:
   check-version:
     runs-on: ubuntu-latest
     outputs:
       should_publish: ${{ steps.check.outputs.should_publish }}
+      n8n_version: ${{ steps.check.outputs.n8n_version }} # Pass the version for tagging
     steps:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -28,31 +30,40 @@ jobs:
         env:
           MY_IMAGE: bitovi/n8n-nodes-markitdown
         run: |
+          # 1. Get the latest official n8n version from NPM
           latest_official_n8n=$(npm view n8n version)
           echo "Latest official n8n version on npm: $latest_official_n8n"
+          echo "n8n_version=${latest_official_n8n}" >> "$GITHUB_OUTPUT"
+
+          # 2. Verify the corresponding tag exists on Docker Hub for n8nio/n8n
+          # This prevents a race condition where npm is updated but the image is not yet pushed.
           echo "Verifying tag '$latest_official_n8n' exists on Docker Hub for n8nio/n8n..."
-          tag_count=$(curl -s "https://hub.docker.com/v2/repositories/n8nio/n8n/tags/?page_size=1&name=${latest_official_n8n}" | jq '.count')
-          if [ "$tag_count" -eq 0 ]; then
-            echo "Latest npm version '$latest_official_n8n' not yet on Docker Hub. Halting."
+          if ! docker manifest inspect "n8nio/n8n:${latest_official_n8n}" > /dev/null; then
+            echo "Latest npm version '$latest_official_n8n' not yet available on Docker Hub. Halting."
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "Latest official version '$latest_official_n8n' is confirmed on Docker Hub."
+
+          # 3. Pull our existing image to check its base version
           echo "Attempting to pull our existing image: ${MY_IMAGE}:latest"
           if ! docker pull "${MY_IMAGE}:latest"; then
             echo "Could not pull existing image. Assuming first run. Proceeding to publish."
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          current_base_version=$(docker run --rm "${MY_IMAGE}:latest" --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n 1)
+
+          # 4. Get the current n8n version from our image's label (more robust)
+          current_base_version=$(docker inspect --format '{{ index .Config.Labels "io.n8n.version.base" }}' "${MY_IMAGE}:latest")
           if [ -z "$current_base_version" ]; then
-            echo "Could not determine n8n version from our image. Proceeding to publish."
+            echo "Could not determine n8n version from our image's label. Proceeding to publish."
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "Current n8n base version in our image: $current_base_version"
-          highest_version=$(printf "%s\n%s" "$current_base_version" "$latest_official_n8n" | sort -V | tail -n 1)
-          if [[ "$highest_version" == "$latest_official_n8n" && "$latest_official_n8n" != "$current_base_version" ]]; then
+
+          # 5. Compare versions
+          if [ "$latest_official_n8n" != "$current_base_version" ]; then
             echo "A newer official n8n version ($latest_official_n8n) is available. Proceeding to publish."
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
           else
@@ -63,6 +74,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: check-version
+    # This job only runs if the check passes
     if: needs.check-version.outputs.should_publish == 'true'
     steps:
       - name: Checkout
@@ -82,10 +94,12 @@ jobs:
           name: dist-artifact
           path: dist/
 
-  build-and-publish-npm:
+  # This job should only run for a release AND if a new n8n version exists
+  publish-npm:
     runs-on: ubuntu-latest
-    needs: build # Depends on the build job now
-    if: github.event_name == 'release' # No longer needs the check-version output, inherits it via `needs`
+    needs: [check-version, build]
+    # Corrected conditional logic
+    if: github.event_name == 'release' && needs.check-version.outputs.should_publish == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -99,22 +113,16 @@ jobs:
         with:
           name: dist-artifact
           path: dist/
-      - name: Catch package.json version mismatch
-        run: |
-          ver=v$(node -p "require('./package.json').version")
-          echo "Version in package.json: $ver"
-          echo "Version in release: ${{ github.event.release.tag_name }}"
-          if [ "$ver" != "${{ github.event.release.tag_name }}" ]; then
-            exit 1
-          fi
-      - name: Dry-run npm publish
+      - name: Dry-run publish to npm
         run: npm publish --access public --dry-run
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  build-and-publish-image:
+  publish-image:
     runs-on: ubuntu-latest
-    needs: build # Depends on the build job now
+    needs: [check-version, build]
+    # THIS IS THE KEY FIX: Added the 'if' condition
+    if: needs.check-version.outputs.should_publish == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -138,45 +146,23 @@ jobs:
         with:
           images: bitovi/n8n-nodes-markitdown
           tags: |
-            # For PRs, create a temporary tag like 'pr-123'
+            # Use the detected n8n version for a specific tag
+            type=raw,value=${{ needs.check-version.outputs.n8n_version }}
+            # Standard tags
+            type=schedule,pattern=latest
             type=ref,event=pr
-
-            # On release, tag with full semver (e.g., 1.2.3, 1.2.3-rc1)
             type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
-            # On stable release, also tag with major.minor
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
-            # On pre-release, tag with 'next'
-            type=raw,value=next,enable=${{ github.event_name == 'release' && github.event.release.prerelease }}
-            # On a stable release OR a scheduled run, update the 'latest' tag
-            type=raw,value=latest,enable=${{ (github.event_name == 'release' && !github.event.release.prerelease) || github.event_name == 'schedule' }}
-
-      # TODO: Before merge, set push: true
-        #uses: docker/metadata-action@v5
-        #with:
-          #images: bitovi/n8n-nodes-markitdown
-          #tags: |
-            ## On release, tag with full semver (e.g., 1.2.3, 1.2.3-rc1)
-            #type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
-            ## On stable release, also tag with major.minor
-            #type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
-            ## On pre-release, tag with 'next'
-            #type=raw,value=next,enable=${{ github.event_name == 'release' && github.event.release.prerelease }}
-            ## On a stable release OR a scheduled run, update the 'latest' tag
-            #type=raw,value=latest,enable=${{ (github.event_name == 'release' && !github.event.release.prerelease) || github.event_name == 'schedule' }}
-      - name: Build and 'dry-run' push Docker image
+            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: false
+          # Change to true to actually publish
+          push: false # Set to 'true' once you've confirmed it works
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
-            # TODO replace with real run
-      #- name: Build and push Docker image
-        #uses: docker/build-push-action@v5
-        #with:
-          #context: .
-          #push: true
-          #tags: ${{ steps.meta.outputs.tags }}
-          #labels: ${{ steps.meta.outputs.labels }}
-          #platforms: linux/amd64,linux/arm64
+          # Pass the n8n version as a build argument to the Dockerfile
+          build-args: |
+            N8N_VERSION=${{ needs.check-version.outputs.n8n_version }}

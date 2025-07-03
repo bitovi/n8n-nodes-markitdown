@@ -1,63 +1,29 @@
-# Start with a Node.js base image (n8n requires Node.js)
-FROM n8nio/n8n:latest
+# Use an ARG to specify the n8n version. This can be set by the GitHub Action.
+ARG N8N_VERSION=latest
 
+# We use the official n8n image as the base for our final image.
+FROM n8nio/n8n:${N8N_VERSION}
+
+# Switch to the root user to install packages
 USER root
 
-# Install system dependencies
-RUN apk add --no-cache \
-    bash \
-    git \
-    curl \
-    wget \
-    build-base \
-    openssl-dev \
-    zlib-dev \
-    bzip2-dev \
-    readline-dev \
-    sqlite-dev \
-    ncurses-dev \
-    xz \
-    libxml2-dev \
-    libffi-dev \
-    python3 \
-    python3-dev \
-    py3-pip \
-    nodejs \
-    npm
+# The n8n base image already contains Python 3 and pip.
+# We only need to install the 'markitdown' library.
+# The --no-cache flag keeps the image size smaller.
+RUN apk add --no-cache git && \
+    pip install markitdown
 
-# Download and install Python 3.10.12
-WORKDIR /tmp
-RUN wget https://www.python.org/ftp/python/3.10.12/Python-3.10.12.tgz \
-    && tar -xvf Python-3.10.12.tgz \
-    && cd Python-3.10.12 \
-    && ./configure --enable-optimizations \
-    && make -j$(nproc) && make altinstall \
-    && cd .. && rm -rf Python-3.10.12.tgz Python-3.10.12
+# The source code for your nodes will be copied from your repository's context.
+# We assume your build process (e.g., `pnpm run build`) creates a `dist` directory.
+# This directory should contain your node's .js files.
+# The 'COPY' command below moves these files into the directory where n8n
+# looks for custom nodes.
+COPY dist/ /home/node/.n8n/custom/
 
-RUN ln -sf /usr/local/bin/python3.10 /usr/bin/python3 && \
-    ln -sf /usr/local/bin/python3.10 /usr/bin/python
+# After copying, we must ensure the 'node' user owns the new files.
+# n8n runs as the 'node' user, and it needs permission to read these files.
+RUN chown -R node:node /home/node/.n8n/custom
 
-# Install pip for Python 3.10
-RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3 get-pip.py && \
-    rm get-pip.py
-
-WORKDIR /
-
-# Actual part needed
-RUN pip install --use-pep517 markitdown
-
-WORKDIR /app
-
-RUN git clone https://github.com/bitovi/n8n-nodes-markitdown
-
-WORKDIR /app/markitdownnode
-
-RUN npm i -g child_process fs-extra tmp-promise
-COPY dist/nodes/ /home/node/.n8n/custom/
-
-# Create data directory for n8n
-RUN mkdir -p /root/.n8n
-
-WORKDIR /
+# Switch back to the non-privileged 'node' user for security.
+# This is the user that n8n will run as.
 USER node

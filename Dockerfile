@@ -1,5 +1,5 @@
 # Start with a Node.js base image (n8n requires Node.js)
-FROM n8nio/n8n:1.75.2
+FROM n8nio/n8n:latest
 
 USER root
 
@@ -45,9 +45,7 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
 WORKDIR /
 
 # Actual part needed
-RUN git clone https://github.com/microsoft/markitdown.git && \
-    cd markitdown && \
-    pip install --use-pep517 packages/markitdown
+RUN pip install --use-pep517 markitdown
 
 WORKDIR /app
 
@@ -56,7 +54,7 @@ RUN git clone https://github.com/bitovi/n8n-nodes-markitdown
 WORKDIR /app/markitdownnode
 
 RUN npm i -g child_process fs-extra tmp-promise
-RUN cp -R dist/nodes/ /home/node/.n8n/custom/
+COPY dist/nodes/ /home/node/.n8n/custom/
 
 # Create data directory for n8n
 RUN mkdir -p /root/.n8n

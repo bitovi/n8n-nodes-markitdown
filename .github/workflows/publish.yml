@@ -36,6 +36,12 @@ jobs:
           MY_IMAGE: bitovi/n8n-nodes-markitdown
         run: |
           latest_official_n8n=$(npm view n8n version)
+
+          if [ -z "$latest_official_n8n" ]; then
+            echo "::error::Failed to get latest n8n version from npm. Halting."
+            exit 1
+          fi
+
           echo "Latest official n8n version on npm: $latest_official_n8n"
           echo "n8n_version=${latest_official_n8n}" >> "$GITHUB_OUTPUT"
 
@@ -69,7 +75,6 @@ jobs:
             echo "Our current base version ($current_base_version) is up-to-date. Skipping publish jobs."
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
           fi
-
   build:
     runs-on: ubuntu-latest
     needs: check-version
@@ -124,114 +129,49 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-  # ===================================================================
-  # TEMPORARY DIAGNOSTIC JOB - REPLACE YOUR publish-image JOB WITH THIS
-  # ===================================================================
   publish-image:
     runs-on: ubuntu-latest
-    needs: [check-version, build] # Keep the needs so it gets the n8n_version
-    # Run this job regardless of the check-version output for this one test
-    if: always()
+    needs: [check-version, build]
+    if: github.event.inputs.force_publish == 'true' || needs.check-version.outputs.should_publish == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Download dist artifact
         uses: actions/download-artifact@v4
         with:
           name: dist-artifact
           path: dist/
-
+      - name: Set up QEMU (multi-arch)
+        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      # --- DIAGNOSTIC STEP 1: VERIFY FILE CONTENTS ---
-      - name: Show what files are checked out
-        run: ls -la
-      - name: Display Dockerfile contents
-        run: |
-          echo "--- Dockerfile content as seen by the runner: ---"
-          cat Dockerfile
-          echo "-------------------------------------------------"
-
-      # --- DIAGNOSTIC STEP 2: BUILD IMAGE LOCALLY ON RUNNER ---
-      - name: Build image but DO NOT PUSH
-        id: build
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      - name: Extract Docker metadata for tagging
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: bitovi/n8n-nodes-markitdown
+          tags: |
+            type=raw,value=latest,enable=${{ github.event.inputs.force_publish == 'true' }}
+            type=raw,value=${{ needs.check-version.outputs.n8n_version }}
+            type=schedule,pattern=latest
+            type=ref,event=pr
+            type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
+            type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          # We set push: false to keep the image on the runner for inspection
-          push: false
-          # We load it so the next step can find it
-          load: true
-          # We still need to give it a name
-          tags: bitovi/n8n-nodes-markitdown:diagnostic-test
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            io.n8n.version.base=${{ needs.check-version.outputs.n8n_version }}
+          platforms: linux/amd64,linux/arm64
           build-args: |
             N8N_VERSION=${{ needs.check-version.outputs.n8n_version }}
-
-      # --- DIAGNOSTIC STEP 3: INSPECT THE BUILT IMAGE ON THE RUNNER ---
-      - name: Inspect the image immediately after build
-        run: |
-          echo "Inspecting the image that was just built on the runner..."
-
-          # First, let's see ALL labels to catch any typos
-          echo "--- All Labels Found: ---"
-          docker inspect --format '{{json .Config.Labels}}' bitovi/n8n-nodes-markitdown:diagnostic-test
-          echo "-------------------------"
-
-          # Now, let's check for our specific label
-          echo "--- Specific Label Check: ---"
-          VERSION_LABEL=$(docker inspect --format '{{ index .Config.Labels "io.n8n.version.base" }}' bitovi/n8n-nodes-markitdown:diagnostic-test)
-
-          if [ -z "$VERSION_LABEL" ]; then
-            echo "::error::FAILURE: The label 'io.n8n.version.base' was NOT found on the image immediately after build."
-            exit 1
-          else
-            echo "SUCCESS: Found label with value: $VERSION_LABEL"
-          fi
-  #publish-image:
-    #runs-on: ubuntu-latest
-    #needs: [check-version, build]
-    #if: github.event.inputs.force_publish == 'true' || needs.check-version.outputs.should_publish == 'true'
-    #steps:
-      #- name: Checkout
-        #uses: actions/checkout@v4
-      #- name: Download dist artifact
-        #uses: actions/download-artifact@v4
-        #with:
-          #name: dist-artifact
-          #path: dist/
-      #- name: Set up QEMU (multi-arch)
-        #uses: docker/setup-qemu-action@v3
-      #- name: Set up Docker Buildx
-        #uses: docker/setup-buildx-action@v3
-      #- name: Login to Docker Hub
-        #uses: docker/login-action@v3
-        #with:
-          #username: ${{ secrets.DOCKERHUB_USERNAME }}
-          #password: ${{ secrets.DOCKERHUB_PASSWORD }}
-      #- name: Extract Docker metadata for tagging
-        #id: meta
-        #uses: docker/metadata-action@v5
-        #with:
-          #images: bitovi/n8n-nodes-markitdown
-          #tags: |
-            #type=raw,value=latest,enable=${{ github.event.inputs.force_publish == 'true' }}
-            #type=raw,value=${{ needs.check-version.outputs.n8n_version }}
-            #type=schedule,pattern=latest
-            #type=ref,event=pr
-            #type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
-            #type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
-            #type=raw,value=latest,enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
-      #- name: Build and push Docker image
-        #uses: docker/build-push-action@v5
-        #with:
-          #context: .
-          #push: true
-          #tags: ${{ steps.meta.outputs.tags }}
-          #labels: |
-            #${{ steps.meta.outputs.labels }}
-            #io.n8n.version.base=${{ needs.check-version.outputs.n8n_version }}
-          #platforms: linux/amd64,linux/arm64
-          #build-args: |
-            #N8N_VERSION=${{ needs.check-version.outputs.n8n_version }}

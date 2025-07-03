@@ -7,10 +7,10 @@ FROM n8nio/n8n:${N8N_VERSION}
 # Switch to the root user to install packages
 USER root
 
-# The n8n base image already contains Python 3 and pip.
-# We only need to install the 'markitdown' library.
-# The --no-cache flag keeps the image size smaller.
-RUN apk add --no-cache git && \
+# The n8n base image has python, but not pip.
+# The fix is to also install 'py3-pip' using the Alpine package manager.
+# We also add build-base and python3-dev for markitdown dependencies.
+RUN apk add --no-cache git py3-pip build-base python3-dev && \
     pip install markitdown
 
 # The source code for your nodes will be copied from your repository's context.

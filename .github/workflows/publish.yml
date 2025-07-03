@@ -130,7 +130,7 @@ jobs:
       - name: Dry-run publish to npm
         run: npm publish --access public --dry-run
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}ND if a new n8n version exists
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   publish-image:
     runs-on: ubuntu-latest

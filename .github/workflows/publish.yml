@@ -1,7 +1,7 @@
 name: Publish
 
 on:
-  pull_request: # Good for testing changes to the workflow itself
+  pull_request:
   release:
     types: [published]
   schedule:

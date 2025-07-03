@@ -1,6 +1,6 @@
 # Use the Debian variant of the n8n image
 ARG N8N_VERSION=latest
-FROM n8nio/n8n:${N8N_VERSION}-debian
+FROM n8nio/n8n:${N8N_VERSION}
 
 # Switch to the root user for installations
 USER root

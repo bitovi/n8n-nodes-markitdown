@@ -1,5 +1,6 @@
 # Use the default Alpine n8n image
-ARG N8N_VERSION=latest
+#ARG N8N_VERSION=latest
+ARG N8N_VERSION=1.99.0
 FROM n8nio/n8n:${N8N_VERSION}
 
 LABEL io.n8n.version.base="${N8N_VERSION}"

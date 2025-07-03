@@ -34,15 +34,14 @@ jobs:
           echo "Latest official n8n version on npm: $latest_official_n8n"
           echo "n8n_version=${latest_official_n8n}" >> "$GITHUB_OUTPUT"
 
-          # <-- LOGIC FIX: Check for the '-debian' suffixed tag we are now using in our Dockerfile.
-          debian_tag="${latest_official_n8n}-debian"
-          echo "Verifying tag '$debian_tag' exists on Docker Hub for n8nio/n8n..."
-          if ! docker manifest inspect "n8nio/n8n:${debian_tag}" > /dev/null; then
-            echo "Latest Debian version '$debian_tag' not yet available on Docker Hub. Halting."
+          n8n_tag="${latest_official_n8n}"
+          echo "Verifying tag '$n8n_tag' exists on Docker Hub for n8nio/n8n..."
+          if ! docker manifest inspect "n8nio/n8n:${n8n_tag}" > /dev/null; then
+            echo "Latest Debian version '$n8n_tag' not yet available on Docker Hub. Halting."
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "Latest official Debian version '$debian_tag' is confirmed on Docker Hub."
+          echo "Latest official Debian version '$n8n_tag' is confirmed on Docker Hub."
 
           echo "Attempting to pull our existing image: ${MY_IMAGE}:latest"
           if ! docker pull "${MY_IMAGE}:latest"; then

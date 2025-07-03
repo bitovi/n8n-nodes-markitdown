@@ -30,22 +30,20 @@ jobs:
         env:
           MY_IMAGE: bitovi/n8n-nodes-markitdown
         run: |
-          # 1. Get the latest official n8n version from NPM
           latest_official_n8n=$(npm view n8n version)
           echo "Latest official n8n version on npm: $latest_official_n8n"
           echo "n8n_version=${latest_official_n8n}" >> "$GITHUB_OUTPUT"
 
-          # 2. Verify the corresponding tag exists on Docker Hub for n8nio/n8n
-          # This prevents a race condition where npm is updated but the image is not yet pushed.
-          echo "Verifying tag '$latest_official_n8n' exists on Docker Hub for n8nio/n8n..."
-          if ! docker manifest inspect "n8nio/n8n:${latest_official_n8n}" > /dev/null; then
-            echo "Latest npm version '$latest_official_n8n' not yet available on Docker Hub. Halting."
+          # <-- LOGIC FIX: Check for the '-debian' suffixed tag we are now using in our Dockerfile.
+          debian_tag="${latest_official_n8n}-debian"
+          echo "Verifying tag '$debian_tag' exists on Docker Hub for n8nio/n8n..."
+          if ! docker manifest inspect "n8nio/n8n:${debian_tag}" > /dev/null; then
+            echo "Latest Debian version '$debian_tag' not yet available on Docker Hub. Halting."
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "Latest official version '$latest_official_n8n' is confirmed on Docker Hub."
+          echo "Latest official Debian version '$debian_tag' is confirmed on Docker Hub."
 
-          # 3. Pull our existing image to check its base version
           echo "Attempting to pull our existing image: ${MY_IMAGE}:latest"
           if ! docker pull "${MY_IMAGE}:latest"; then
             echo "Could not pull existing image. Assuming first run. Proceeding to publish."
@@ -53,7 +51,7 @@ jobs:
             exit 0
           fi
 
-          # 4. Get the current n8n version from our image's label (more robust)
+          # The n8n base images label their version as 'io.n8n.version.base'
           current_base_version=$(docker inspect --format '{{ index .Config.Labels "io.n8n.version.base" }}' "${MY_IMAGE}:latest")
           if [ -z "$current_base_version" ]; then
             echo "Could not determine n8n version from our image's label. Proceeding to publish."
@@ -62,7 +60,6 @@ jobs:
           fi
           echo "Current n8n base version in our image: $current_base_version"
 
-          # 5. Compare versions
           if [ "$latest_official_n8n" != "$current_base_version" ]; then
             echo "A newer official n8n version ($latest_official_n8n) is available. Proceeding to publish."
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
@@ -74,7 +71,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: check-version
-    # This job only runs if the check passes
     if: needs.check-version.outputs.should_publish == 'true'
     steps:
       - name: Checkout
@@ -94,10 +90,10 @@ jobs:
           name: dist-artifact
           path: dist/
 
-  # This job should only run for a release A
-   publish-npm:
+  publish-npm:
     runs-on: ubuntu-latest
     needs: [check-version, build]
+    # This job should only run for a release AND if a new n8n version is detected
     if: github.event_name == 'release' && needs.check-version.outputs.should_publish == 'true'
     steps:
       - name: Checkout
@@ -112,22 +108,16 @@ jobs:
         with:
           name: dist-artifact
           path: dist/
-
       - name: Verify package.json version matches release tag
         run: |
-          # The release tag is expected to be like 'v1.2.3'
-          # This line gets the version from package.json (e.g., '1.2.3') and prepends 'v'
           ver="v$(node -p "require('./package.json').version")"
-
           echo "Version in package.json: $ver"
           echo "Version from release tag: ${{ github.event.release.tag_name }}"
-
           if [ "$ver" != "${{ github.event.release.tag_name }}" ]; then
             echo "Error: The package.json version does not match the release tag."
             exit 1
           fi
           echo "Version check passed."
-
       - name: Dry-run publish to npm
         run: npm publish --access public --dry-run
         env:
@@ -160,9 +150,7 @@ jobs:
         with:
           images: bitovi/n8n-nodes-markitdown
           tags: |
-            # Use the detected n8n version for a specific tag
             type=raw,value=${{ needs.check-version.outputs.n8n_version }}
-            # Standard tags
             type=schedule,pattern=latest
             type=ref,event=pr
             type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}

@@ -1,4 +1,5 @@
 # Use the default Alpine n8n image
+
 ARG N8N_VERSION=latest
 FROM n8nio/n8n:${N8N_VERSION}
 

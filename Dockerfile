@@ -45,7 +45,7 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
 WORKDIR /
 
 # Actual part needed
-RUN pip install markitdown
+RUN pip install --use-pep517 markitdown
 
 WORKDIR /app
 

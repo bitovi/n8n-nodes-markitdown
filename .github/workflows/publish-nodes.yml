@@ -1,0 +1,34 @@
+name: Publish Custom Nodes to npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      nodes:
+        description: "Comma-separated list of node directories to publish (e.g. Markitdown,OtherNode)"
+        required: true
+        default: "Markitdown"
+
+jobs:
+  publish-nodes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - run: pnpm install
+
+      - name: Parse and publish nodes
+        run: |
+          IFS=',' read -ra NODE_LIST <<< "${{ github.event.inputs.nodes }}"
+          for node in "${NODE_LIST[@]}"; do
+            echo "Building $node"
+            pnpm --filter ./nodes/$node... build
+
+            echo "Publishing $node"
+            cd nodes/$node
+            npm publish --access public
+            cd -
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

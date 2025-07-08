@@ -1,0 +1,10 @@
+{
+  "node": "n8n-nodes-base.NodeTemplate",
+  "nodeVersion": "0.1",
+  "codexVersion": "1.0",
+  "categories": ["Custom Nodes"],
+  "resources": {},
+  "subcategories": {
+    "Core Nodes": ["Templates"]
+  }
+} 

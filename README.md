@@ -4,31 +4,6 @@ This repository is a monorepo for custom [n8n](https://n8n.io/) nodes, including
 
 ---
 
-## Monorepo Structure
-
-```
-├── nodes/
-│   ├── Markitdown/           # Example custom node
-│   │   ├── Markitdown.node.ts
-│   │   ├── Markitdown.node.json
-│   │   ├── package.json
-│   │   └── ...
-│   └── NodeTemplate/         # Template for new nodes
-│       ├── NodeTemplate.node.ts
-│       ├── NodeTemplate.node.json
-│       ├── package.json
-│       └── README.md
-├── dist/                     # Bundled output for Docker/n8n
-├── scripts/
-│   └── bundle-nodes.js       # Bundles all node outputs to dist/
-├── package.json              # Root, manages workspaces and shared tooling
-├── tsconfig.json             # Shared TypeScript config
-├── Dockerfile                # For building a custom n8n image
-└── ...
-```
-
----
-
 ## Adding a New Node
 
 1. **Copy the template:**
@@ -43,20 +18,17 @@ This repository is a monorepo for custom [n8n](https://n8n.io/) nodes, including
 
 ---
 
-## Building & Testing
+## Building, Testing, and Local Development
 
-- **Install dependencies:**
+- **Install all dependencies (root and subnodes):**
   ```sh
   pnpm install
   ```
+  This will install all dependencies for the monorepo and for each subnode automatically.
 - **Build all nodes:**
   ```sh
   pnpm build
   ```
-  This will:
-  - Build all node packages
-  - Copy icons
-  - Bundle all outputs to `dist/nodes/YourNodeName/`
 - **Test all nodes:**
   ```sh
   pnpm test
@@ -65,17 +37,32 @@ This repository is a monorepo for custom [n8n](https://n8n.io/) nodes, including
   ```sh
   pnpm --filter ./nodes/YourNodeName... test
   ```
+> **Note:** After running `pnpm build`, all built nodes are automatically copied to your local n8n custom directory (`~/.n8n/custom/nodes/`) for local development.
 
 ---
 
 ## Docker & Deployment
 
-- The Dockerfile expects all built node outputs in `dist/nodes/YourNodeName/`.
+- The Dockerfile expects all built node outputs in `dist/nodes/YourNodeName/`. This is handled by the `pnpm build` step.
 - After building, you can build your Docker image as usual:
   ```sh
-  docker build -t your-n8n-custom .
+  docker build -t n8n-subnodes .
   ```
-- The image will include all custom nodes in the `dist/` directory.
+- Run the Docker container:
+  ```sh
+  docker run -it --rm \
+    -p 5678:5678 \
+    -e N8N_COMMUNITY_PACKAGES_ENABLED=true \
+    n8n-subnodes
+  ```
+- (Optional) For live development, mount your local `dist/nodes`:
+  ```sh
+  docker run -it --rm \
+    -p 5678:5678 \
+    -e N8N_COMMUNITY_PACKAGES_ENABLED=true \
+    -v $PWD/dist/nodes:/home/node/.n8n/custom/nodes \
+    n8n-subnodes
+  ```
 
 ---
 
@@ -87,48 +74,14 @@ This repository is a monorepo for custom [n8n](https://n8n.io/) nodes, including
   npm publish --access public
   ```
 - **Release workflow:**
-  - The repo includes GitHub Actions for CI and can be extended for per-node publishing.
-  - Update the matrix in `.github/workflows/node-ci.yml` to add new nodes to CI.
+  - The repo includes GitHub Actions for CI, npm publishing, and Docker image publishing.
+  - Update the matrix in `.github/workflows/publish-npm-nodes.yml` to add new nodes to npm publishing.
 
 ---
 
-## Markitdown Node Usage
+## Markitdown Node
 
-This repo includes a node that integrates with Microsoft's [Markitdown](https://github.com/microsoft/markitdown) tool for converting various document formats into structured Markdown.
-
-### Installation
-
-- Requires a self-hosted n8n instance.
-- Markitdown must be installed in your environment (see below).
-- Enable community nodes in n8n: `N8N_COMMUNITY_PACKAGES_ENABLED=true`
-- In the n8n UI, go to `/settings/community-nodes` and add `@bitovi/n8n-nodes-markitdown`.
-
-#### Option 1: Manual Install
-
-See the Dockerfile and Markitdown documentation for required dependencies and installation steps.
-
-#### Option 2: Use the Provided Docker Image
-
-```
-FROM bitovi/n8n-nodes-markitdown:latest
-# Add your customizations here
-```
-
-### Supported File Types
-- PDF
-- PowerPoint
-- Word
-- Excel
-- Images (EXIF, OCR)
-- Audio (EXIF, transcription)
-- HTML
-- CSV, JSON, XML
-- ZIP files
-- Youtube URLs
-- ...and more!
-
-### Finding the Node
-Search for "markitdown" in the n8n node search bar.
+For details on using the Markitdown node, see [`nodes/Markitdown/README.md`](nodes/Markitdown/README.md).
 
 ---
 

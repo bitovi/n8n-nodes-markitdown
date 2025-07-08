@@ -13,17 +13,21 @@
     "eslint": "^8.56.0",
     "eslint-plugin-n8n-nodes-base": "^1.16.1",
     "gulp": "^4.0.2",
-    "prettier": "^3.3.2",
-    "typescript": "^5.5.3",
     "jest": "^29.7.0",
-    "ts-jest": "^29.2.6"
+    "prettier": "^3.3.2",
+    "ts-jest": "^29.2.6",
+    "typescript": "^5.5.3"
   },
   "scripts": {
-    "build": "pnpm -r run build && gulp build:icons && node scripts/bundle-nodes.js",
+    "build": "pnpm -r run build && gulp build:icons && node scripts/bundle-nodes.js && node scripts/link-n8n-custom.js",
     "dev": "pnpm -r run dev",
     "format": "prettier nodes --write",
     "lint": "eslint nodes",
     "lintfix": "eslint nodes --fix",
-    "test": "pnpm -r run test"
+    "test": "pnpm -r run test",
+    "postinstall": "node scripts/install-subnodes.js"
+  },
+  "dependencies": {
+    "fs-extra": "^11.3.0"
   }
 }

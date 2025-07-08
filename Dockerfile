@@ -1,5 +1,3 @@
-# Use the default Alpine n8n image
-
 ARG N8N_VERSION=latest
 FROM n8nio/n8n:${N8N_VERSION}
 
@@ -7,6 +5,10 @@ LABEL io.n8n.version.base="${N8N_VERSION}"
 
 # Switch to the root user for installations
 USER root
+
+# === Install pnpm ===
+# The base n8n image does not include pnpm, so we install it globally using npm.
+RUN npm install -g pnpm
 
 # === Python Dependencies for Alpine ===
 # This uses Alpine's 'apk' package manager.
@@ -24,7 +26,7 @@ WORKDIR /home/node/.n8n/custom
 # Copy package manifests to leverage Docker cache
 COPY package.json pnpm-lock.yaml ./
 
-# Install production Node.js dependencies. 'pnpm' is included in the base image.
+# Install production Node.js dependencies.
 RUN pnpm install --prod
 
 # Copy the built application code

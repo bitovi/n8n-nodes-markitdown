@@ -27,7 +27,7 @@ jobs:
 
             echo "Publishing $node"
             cd nodes/$node
-            npm publish --access public
+            npm publish --access --dry-run public
             cd -
           done
         env:

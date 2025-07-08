@@ -1,0 +1,23 @@
+{
+  "name": "@your-scope/n8n-nodes-template",
+  "version": "0.0.1",
+  "description": "n8n custom node template - update this for your node",
+  "main": "NodeTemplate.node.js",
+  "types": "NodeTemplate.node.ts",
+  "files": [
+    "NodeTemplate.node.js",
+    "NodeTemplate.node.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "fs-extra": "^11.3.0",
+    "tmp-promise": "^3.0.3",
+    "child_process": "^1.0.2"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+} 

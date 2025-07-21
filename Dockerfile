@@ -18,25 +18,10 @@ RUN apk add --no-cache --virtual .build-deps git build-base python3-dev py3-pip 
     pip install markitdown --break-system-packages && \
     apk del .build-deps
 
-# === Node.js Dependencies ===
-# Set the working directory for our custom node installation
-WORKDIR /home/node/.n8n/custom
-
-# Copy package manifests to leverage Docker cache
-COPY package.json pnpm-lock.yaml ./
-
-# Install production Node.js dependencies. 'pnpm' is included in the base image.
-RUN pnpm install --prod
-
-# Copy the built application code
-COPY dist/ .
-
-# === Final Steps ===
-# Ensure the 'node' user owns all the new files
-RUN chown -R node:node /home/node/.n8n/custom
-
 # Switch back to the non-privileged 'node' user for security
 USER node
 
 # Set the main working directory back to n8n's default
 WORKDIR /home/node
+
+RUN npm i @bitovi/n8n-nodes-markitdown

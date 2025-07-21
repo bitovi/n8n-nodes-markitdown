@@ -1,6 +1,6 @@
 {
   "name": "@bitovi/n8n-nodes-markitdown",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "n8n node to process files with Markitdown",
   "keywords": [
     "n8n-community-node-package",
@@ -37,7 +37,7 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "nodes": [
-      "dist/nodes/Markitdown/MarkitdownNode.node.js"
+      "dist/nodes/Markitdown/Markitdown.node.js"
     ]
   },
   "devDependencies": {

@@ -3,6 +3,7 @@
 ARG N8N_VERSION=latest
 FROM n8nio/n8n:${N8N_VERSION}
 
+ARG N8N_VERSION
 LABEL io.n8n.version.base="${N8N_VERSION}"
 
 # Switch to the root user for installations
@@ -21,7 +22,11 @@ RUN apk add --no-cache --virtual .build-deps git build-base python3-dev py3-pip 
 # Switch back to the non-privileged 'node' user for security
 USER node
 
+# Set the working directory to n8n's default
+WORKDIR /home/node/.n8n
+
+# Install the n8n Markitdown nodes package
+RUN npm install @bitovi/n8n-nodes-markitdown
+
 # Set the main working directory back to n8n's default
 WORKDIR /home/node
-
-RUN npm i @bitovi/n8n-nodes-markitdown

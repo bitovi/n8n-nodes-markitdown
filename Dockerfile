@@ -7,6 +7,7 @@ LABEL io.n8n.version.base="${N8N_VERSION}"
 
 # Switch to the root user for installations
 USER root
+RUN npm install -g pnpm
 
 # === Python Dependencies for Alpine ===
 # This uses Alpine's 'apk' package manager.

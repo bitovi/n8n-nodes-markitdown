@@ -6,24 +6,31 @@ FROM n8nio/n8n:${N8N_VERSION}
 ARG N8N_VERSION
 LABEL io.n8n.version.base="${N8N_VERSION}"
 
-# Switch to the root user for installations
+# Install Python and system dependencies for markitdown
 USER root
-RUN npm install -g pnpm
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    ffmpeg \
+    perl-image-exiftool \
+    && ln -sf python3 /usr/bin/python
 
-# === Python Dependencies for Alpine ===
-# This uses Alpine's 'apk' package manager.
-# 1. Create a temporary virtual package '.build-deps' with all build dependencies.
-# 2. Use pip to install markitdown, adding '--break-system-packages' to handle PEP 668.
-# 3. Remove the entire virtual package, cleaning up build tools to keep the image small.
-RUN apk add --no-cache --virtual .build-deps git build-base python3-dev py3-pip && \
-    pip install markitdown --break-system-packages && \
-    apk del .build-deps
+# Set environment variables for markitdown
+ENV EXIFTOOL_PATH=/usr/bin/exiftool
+ENV FFMPEG_PATH=/usr/bin/ffmpeg
 
-# Switch back to the non-privileged 'node' user for security
+# Create a virtual environment and install markitdown
+RUN python3 -m venv /opt/markitdown-venv \
+    && /opt/markitdown-venv/bin/pip install --no-cache-dir markitdown[all]
+
+# Add the virtual environment to PATH so markitdown is available
+ENV PATH="/opt/markitdown-venv/bin:$PATH"
+
+# Switch back to node user
 USER node
 
 # Set the working directory to n8n's default
-WORKDIR /home/node/.n8n
+WORKDIR /home/node/.n8n/nodes
 
 # Install the n8n Markitdown nodes package
 RUN npm install @bitovi/n8n-nodes-markitdown

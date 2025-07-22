@@ -77,8 +77,8 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: check-version
-    if: github.event.inputs.force_publish == 'true' || needs.check-version.outputs.should_publish == 'true' || github.event_name == 'schedule'
+    # needs: check-version
+    # if: github.event.inputs.force_publish == 'true' || needs.check-version.outputs.should_publish == 'true' || github.event_name == 'schedule'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -99,7 +99,9 @@ jobs:
 
   publish-npm:
     runs-on: ubuntu-latest
-    needs: [check-version, build]
+    needs:
+      - build
+      # - check-version
     if: github.event_name == 'release' && (github.event.inputs.force_publish == 'true' || needs.check-version.outputs.should_publish == 'true')
     steps:
       - name: Checkout
@@ -131,7 +133,9 @@ jobs:
 
   publish-image:
     runs-on: ubuntu-latest
-    needs: [check-version, build]
+    needs:
+      - build
+      # - check-version
     if: github.event.inputs.force_publish == 'true' || needs.check-version.outputs.should_publish == 'true' || github.event_name == 'schedule'
     steps:
       - name: Checkout

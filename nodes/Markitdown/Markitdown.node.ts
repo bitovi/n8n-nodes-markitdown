@@ -2,7 +2,8 @@ import {
 	IExecuteFunctions,
   INodeExecutionData,
   INodeType,
-  INodeTypeDescription
+  INodeTypeDescription,
+  NodeOperationError
 } from 'n8n-workflow';
 import { promises as fsPromise } from 'fs-extra';
 import { file as tmpFile } from 'tmp-promise';
@@ -14,7 +15,7 @@ const execPromise = promisify(exec);
 /**
  * Check if markitdown command is available and get its path
  */
-async function checkMarkitdownAvailability(): Promise<string> {
+async function checkMarkitdownAvailability(node: any): Promise<string> {
   try {
     // First try the direct command
     await execPromise('markitdown --version');
@@ -32,7 +33,7 @@ async function checkMarkitdownAvailability(): Promise<string> {
       // Continue to the error below
     }
     
-    throw new Error(
+    throw new NodeOperationError(node, 
       'markitdown command not found. Please ensure Python and markitdown are installed:\n' +
       '1. Install Python 3: https://python.org\n' +
       '2. Install markitdown: pip install markitdown\n' +
@@ -72,9 +73,9 @@ export class Markitdown implements INodeType {
     // Check if markitdown is available before processing any items and get its path
     let markitdownCommand: string;
     try {
-      markitdownCommand = await checkMarkitdownAvailability();
+      markitdownCommand = await checkMarkitdownAvailability(this.getNode());
     } catch (error) {
-      throw new Error(`Dependency check failed: ${error.message}`);
+      throw error; // Re-throw NodeOperationError from checkMarkitdownAvailability
     }
 
     const items = this.getInputData();

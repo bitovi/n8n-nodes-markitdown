@@ -14,61 +14,39 @@ This repo contains an [n8n](https://n8n.io/) community node that intregrates wit
 
 ### Option 1 (Reccomended)
 ```
-# Install system dependencies
+FROM n8nio/n8n:latest
+
+# Install Python and system dependencies for markitdown
+USER root
 RUN apk add --no-cache \
-    bash \
-    git \
-    curl \
-    wget \
-    build-base \
-    openssl-dev \
-    zlib-dev \
-    bzip2-dev \
-    readline-dev \
-    sqlite-dev \
-    ncurses-dev \
-    xz \
-    libxml2-dev \
-    libffi-dev \
     python3 \
-    python3-dev \
     py3-pip \
-    nodejs \
-    npm
+    ffmpeg \
+    perl-image-exiftool \
+    && ln -sf python3 /usr/bin/python
 
-# Download and install Python. Needed to compile Markitdown
-WORKDIR /tmp
-RUN wget https://www.python.org/ftp/python/3.10.12/Python-3.10.12.tgz \
-    && tar -xvf Python-3.10.12.tgz \
-    && cd Python-3.10.12 \
-    && ./configure --enable-optimizations \
-    && make -j$(nproc) && make altinstall \
-    && cd .. && rm -rf Python-3.10.12.tgz Python-3.10.12
+# Set environment variables for markitdown
+ENV EXIFTOOL_PATH=/usr/bin/exiftool
+ENV FFMPEG_PATH=/usr/bin/ffmpeg
 
-RUN ln -sf /usr/local/bin/python3.10 /usr/bin/python3 && \
-    ln -sf /usr/local/bin/python3.10 /usr/bin/python
+# Create a virtual environment and install markitdown
+RUN python3 -m venv /opt/markitdown-venv \
+    && /opt/markitdown-venv/bin/pip install --no-cache-dir markitdown[all]
 
-# Install pip for Python 3.10
-RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
-    python3 get-pip.py && \
-    rm get-pip.py
+# Add the virtual environment to PATH so markitdown is available
+ENV PATH="/opt/markitdown-venv/bin:$PATH"
 
-WORKDIR /
+# Switch back to node user
+USER node
 
-# Install Markitdown on the image
-RUN git clone https://github.com/microsoft/markitdown.git && \
-    cd markitdown && \
-    pip install --use-pep517 packages/markitdown
+# Set the working directory to n8n's default
+WORKDIR /home/node/.n8n/nodes
 
-WORKDIR /app
+# Install the n8n Markitdown nodes package
+RUN npm install @bitovi/n8n-nodes-markitdown@latest
 
-# Install custom node to interact with Markitdown from n8n
-RUN git clone https://github.com/bitovi/n8n-nodes-markitdown
-
-WORKDIR /app/markitdownnode
-
-RUN npm i -g child_process fs-extra tmp-promise
-RUN cp -R dist/nodes/ /home/node/.n8n/custom/
+# Set the main working directory back to n8n's default
+WORKDIR /home/node
 ```
 
 ### Option 2

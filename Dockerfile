@@ -33,7 +33,7 @@ USER node
 WORKDIR /home/node/.n8n/nodes
 
 # Install the n8n Markitdown nodes package
-RUN npm install @bitovi/n8n-nodes-markitdown
+RUN npm install @bitovi/n8n-nodes-markitdown@latest
 
 # Set the main working directory back to n8n's default
 WORKDIR /home/node

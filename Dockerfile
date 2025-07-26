@@ -13,20 +13,25 @@ RUN npm install -g pnpm
 # === Python Dependencies for Alpine ===
 # This uses Alpine's 'apk' package manager.
 # 1. Create a temporary virtual package '.build-deps' with all build dependencies.
-# 2. Use pip to install markitdown, adding '--break-system-packages' to handle PEP 668.
-# 3. Remove the entire virtual package, cleaning up build tools to keep the image small.
+# 2. Use pip to install markitdown globally, adding '--break-system-packages' to handle PEP 668.
+# 3. Ensure Python runtime packages remain installed.
+# 4. Remove only the build dependencies to keep the image smaller.
 RUN apk add --no-cache --virtual .build-deps git build-base python3-dev py3-pip && \
+    apk add --no-cache python3 && \
     pip install markitdown --break-system-packages && \
     apk del .build-deps
+
+# Ensure the Python scripts directory is in PATH for all users
+ENV PATH="/usr/local/bin:$PATH"
 
 # Switch back to the non-privileged 'node' user for security
 USER node
 
 # Set the working directory to n8n's default
-WORKDIR /home/node/.n8n
+WORKDIR /home/node/.n8n/nodes
 
 # Install the n8n Markitdown nodes package
-RUN npm install @bitovi/n8n-nodes-markitdown
+RUN npm install @bitovi/n8n-nodes-markitdown@latest --only=prod
 
 # Set the main working directory back to n8n's default
 WORKDIR /home/node

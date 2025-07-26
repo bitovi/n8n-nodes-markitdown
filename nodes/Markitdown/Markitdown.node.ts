@@ -11,6 +11,37 @@ import { promisify } from 'util'
 
 const execPromise = promisify(exec);
 
+/**
+ * Check if markitdown command is available and get its path
+ */
+async function checkMarkitdownAvailability(): Promise<string> {
+  try {
+    // First try the direct command
+    await execPromise('markitdown --version');
+    return 'markitdown';
+  } catch (error) {
+    // Try to find it using which/where
+    try {
+      const { stdout } = await execPromise('which markitdown 2>/dev/null || find /usr -name markitdown 2>/dev/null | head -1');
+      const markitdownPath = stdout.trim();
+      if (markitdownPath) {
+        await execPromise(`${markitdownPath} --version`);
+        return markitdownPath;
+      }
+    } catch (findError) {
+      // Continue to the error below
+    }
+    
+    throw new Error(
+      'markitdown command not found. Please ensure Python and markitdown are installed:\n' +
+      '1. Install Python 3: https://python.org\n' +
+      '2. Install markitdown: pip install markitdown\n' +
+      '3. Ensure markitdown is in your PATH\n' +
+      'Original error: ' + error.message
+    );
+  }
+}
+
 export class Markitdown implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Markitdown',
@@ -38,6 +69,14 @@ export class Markitdown implements INodeType {
     ],
 	};
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+    // Check if markitdown is available before processing any items and get its path
+    let markitdownCommand: string;
+    try {
+      markitdownCommand = await checkMarkitdownAvailability();
+    } catch (error) {
+      throw new Error(`Dependency check failed: ${error.message}`);
+    }
+
     const items = this.getInputData();
     const returnData: INodeExecutionData[] = [];
 
@@ -58,7 +97,7 @@ export class Markitdown implements INodeType {
 					postfix: '.md',
 				});
 
-        const command = `markitdown "${inputTmpFile.path}" -o "${outputTmpFile.path}"`.trim();
+        const command = `${markitdownCommand} "${inputTmpFile.path}" -o "${outputTmpFile.path}"`.trim();
 
 				await execPromise(command);
 

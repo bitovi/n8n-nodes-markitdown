@@ -1,225 +1,53 @@
 name: Publish
 
+# This builds and pushes the package to NPM. If something goes wrong, then the package is
+# not published. The error should be corrected and the release and tag should be deleted
+# before trying again.
+
 on:
-  schedule:
-    - cron: '0 16 * * *' # Daily at 10am CST (16:00 UTC)
   release:
     types: [published]
-  workflow_dispatch:
-    inputs:
-      force_publish:
-        description: 'Force publish even if n8n version has not changed'
-        required: false
-        type: boolean
-        default: false
-
 permissions:
   contents: read
-  packages: write # Needed for publishing to DockerHub
 
 jobs:
-  check-version:
+  build-and-publish:
     runs-on: ubuntu-latest
-    outputs:
-      should_publish: ${{ steps.check.outputs.should_publish }}
-      n8n_version: ${{ steps.check.outputs.n8n_version }}
-    steps:
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-      - name: Check for newer n8n base image
-        id: check
-        env:
-          MY_IMAGE: bitovi/n8n-nodes-markitdown
-        run: |
-          latest_official_n8n=$(npm view n8n version)
-
-          if [ -z "$latest_official_n8n" ]; then
-            echo "::error::Failed to get latest n8n version from npm. Halting."
-            exit 1
-          fi
-
-          echo "Latest official n8n version on npm: $latest_official_n8n"
-          echo "n8n_version=${latest_official_n8n}" >> "$GITHUB_OUTPUT"
-
-          echo "Verifying tag '$latest_official_n8n' exists on Docker Hub for n8nio/n8n..."
-          if ! docker manifest inspect "n8nio/n8n:${latest_official_n8n}" > /dev/null; then
-            echo "Latest npm version '$latest_official_n8n' not yet available on Docker Hub. Halting."
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "Latest official version '$latest_official_n8n' is confirmed on Docker Hub."
-
-          echo "Attempting to pull our existing image: ${MY_IMAGE}:latest"
-          if ! docker pull "${MY_IMAGE}:latest"; then
-            echo "Could not pull existing image. Assuming first run. Proceeding to publish."
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          current_base_version=$(docker inspect --format '{{ index .Config.Labels "io.n8n.version.base" }}' "${MY_IMAGE}:latest")
-          if [ -z "$current_base_version" ]; then
-            echo "Could not determine n8n version from our image's label. Proceeding to publish."
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "Current n8n base version in our image: $current_base_version"
-
-          if [ "$latest_official_n8n" != "$current_base_version" ]; then
-            echo "A newer official n8n version ($latest_official_n8n) is available. Proceeding to publish."
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Our current base version ($current_base_version) is up-to-date. Skipping publish jobs."
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  build:
-    runs-on: ubuntu-latest
-    needs: check-version
-    if: github.event.inputs.force_publish == 'true' || needs.check-version.outputs.should_publish == 'true' || github.event_name == 'schedule' || github.event_name == 'release'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-      - uses: pnpm/action-setup@v4
-      - name: Install packages
-        run: pnpm i
-      - name: Build project
-        run: pnpm run --if-present build
-      - name: Upload dist artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist-artifact
-          path: dist/
 
-  publish-npm:
-    runs-on: ubuntu-latest
-    needs: [check-version, build]
-    if: github.event_name == 'release'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9.1.4
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Download dist artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-artifact
-          path: dist/
-      - name: Verify package.json version matches release tag
+
+      - name: Catch package.json version mismatch
         run: |
-          ver="v$(node -p "require('./package.json').version")"
+          ver=v$(node -p "require('./package.json').version")
           echo "Version in package.json: $ver"
-          echo "Version from release tag: ${{ github.event.release.tag_name }}"
+          echo "Version in release: ${{ github.event.release.tag_name }}"
           if [ "$ver" != "${{ github.event.release.tag_name }}" ]; then
-            echo "Error: The package.json version does not match the release tag."
             exit 1
           fi
-          echo "Version check passed."
-      # Built via the prepublish script in package.json
-      - name: Publish to npm
-        run: npm publish --access public
+
+      - uses: pnpm/action-setup@v4
+
+      - name: Install packages
+        run: pnpm i
+
+      - name: Run CI
+        run: pnpm run --if-present ci
+
+      - name: Build project
+        run: pnpm run --if-present build
+
+      - name: Run tests
+        run: pnpm run --if-present test
+
+      - run: npm publish --access public
         env:
+          # setup-node creates an .npmrc that references NODE_AUTH_TOKEN
+          # secrets.NPM_TOKEN must be provided in the repo settings.
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  publish-image:
-    runs-on: ubuntu-latest
-    needs: [check-version, build]
-    if: (github.event.inputs.force_publish == 'true' || needs.check-version.outputs.should_publish == 'true' || github.event_name == 'schedule') && github.event_name != 'release'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Download dist artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-artifact
-          path: dist/
-      - name: Set up QEMU (multi-arch)
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-      - name: Extract Docker metadata for tagging
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: bitovi/n8n-nodes-markitdown
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ needs.check-version.outputs.n8n_version }}
-            type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: |
-            ${{ steps.meta.outputs.labels }}
-            io.n8n.version.base=${{ needs.check-version.outputs.n8n_version }}
-          platforms: linux/amd64,linux/arm64
-          build-args: |
-            N8N_VERSION=${{ needs.check-version.outputs.n8n_version }}
-
-  publish-image-after-npm:
-    runs-on: ubuntu-latest
-    needs: [check-version, build, publish-npm]
-    if: github.event_name == 'release'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Download dist artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: dist-artifact
-          path: dist/
-      - name: Set up QEMU (multi-arch)
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
-      - name: Extract Docker metadata for tagging
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: bitovi/n8n-nodes-markitdown
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ needs.check-version.outputs.n8n_version }}
-            type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
-            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name == 'release' && !github.event.release.prerelease }}
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: |
-            ${{ steps.meta.outputs.labels }}
-            io.n8n.version.base=${{ needs.check-version.outputs.n8n_version }}
-          platforms: linux/amd64,linux/arm64
-          build-args: |
-            N8N_VERSION=${{ needs.check-version.outputs.n8n_version }}

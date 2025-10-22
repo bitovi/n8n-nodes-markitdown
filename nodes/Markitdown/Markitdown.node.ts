@@ -1,4 +1,5 @@
 import {
+	BINARY_ENCODING,
 	IExecuteFunctions,
   INodeExecutionData,
   INodeType,
@@ -9,6 +10,7 @@ import { promises as fsPromise } from 'fs-extra';
 import { file as tmpFile } from 'tmp-promise';
 import { exec } from 'child_process';
 import { promisify } from 'util'
+import { Readable } from 'stream';
 
 const execPromise = promisify(exec);
 
@@ -32,8 +34,8 @@ async function checkMarkitdownAvailability(node: any): Promise<string> {
     } catch (findError) {
       // Continue to the error below
     }
-    
-    throw new NodeOperationError(node, 
+
+    throw new NodeOperationError(node,
       'markitdown command not found. Please ensure Python and markitdown are installed:\n' +
       '1. Install Python 3: https://python.org\n' +
       '2. Install markitdown: pip install markitdown\n' +
@@ -91,7 +93,17 @@ export class Markitdown implements INodeType {
 					prefix: 'n8n-markitdown-input-',
 					postfix: binaryData.fileName
 				});
-				await fsPromise.writeFile(inputTmpFile.path, Buffer.from(binaryData.data, 'base64'));
+
+				// Get binary data - handles local/remote automatically
+
+        let uploadData: Buffer | Readable;
+        if (binaryData.id) {
+          console.log('This file has an ID, fetching binary data from n8n storage.');
+          uploadData = await this.helpers.getBinaryStream(binaryData.id);
+        } else {
+          uploadData = Buffer.from(binaryData.data, BINARY_ENCODING);
+        }
+				await fsPromise.writeFile(inputTmpFile.path, uploadData);
 
 				const outputTmpFile = await tmpFile({
 					prefix: 'n8n-markitdown-output-',
